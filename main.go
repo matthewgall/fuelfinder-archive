@@ -44,7 +44,12 @@ func main() {
 		exitWithError(fmt.Errorf("create request: %w", err))
 	}
 
-	req.Header.Set("User-Agent", "FuelFinderArchiveBot/1.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/csv,application/octet-stream;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-GB,en;q=0.9")
+	req.Header.Set("Referer", "https://www.gov.uk/guidance/access-fuel-price-data")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
 
 	resp, err := client.Do(req)
 	if err != nil {
