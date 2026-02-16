@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -23,8 +24,13 @@ const fuelFinderURL = "https://www.fuel-finder.service.gov.uk/internal/v1.0.2/cs
 
 func main() {
 	outPath := flag.String("out", getEnvDefault("FUEL_OUT", "data.csv"), "output path for CSV data")
+	outputPath := flag.String("output", "", "output path for CSV data")
 	format := flag.String("format", getEnvDefault("FUEL_FORMAT", "csv"), "output format: csv or json")
 	flag.Parse()
+
+	if *outputPath != "" {
+		*outPath = *outputPath
+	}
 
 	if *format == "json" && *outPath == "data.csv" {
 		*outPath = "data.json"
@@ -39,35 +45,9 @@ func main() {
 	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, fuelFinderURL, nil)
+	payload, err := fetchFuelData(client)
 	if err != nil {
-		exitWithError(fmt.Errorf("create request: %w", err))
-	}
-
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	req.Header.Set("Accept", "text/csv,application/octet-stream;q=0.9,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-GB,en;q=0.9")
-	req.Header.Set("Referer", "https://www.gov.uk/guidance/access-fuel-price-data")
-	req.Header.Set("Cache-Control", "no-cache")
-	req.Header.Set("Pragma", "no-cache")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		exitWithError(fmt.Errorf("fetch fuel data: %w", err))
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		exitWithError(fmt.Errorf("unexpected status: %s", resp.Status))
-	}
-
-	payload, err := io.ReadAll(resp.Body)
-	if err != nil {
-		exitWithError(fmt.Errorf("read response: %w", err))
-	}
-
-	if len(payload) == 0 {
-		exitWithError(errors.New("received empty response"))
+		exitWithError(err)
 	}
 
 	if err := validateCSV(payload); err != nil {
@@ -103,6 +83,75 @@ func validateCSV(payload []byte) error {
 		}
 		return err
 	}
+}
+
+func fetchFuelData(client *http.Client) ([]byte, error) {
+	var lastErr error
+	for _, target := range buildFuelFinderTargets() {
+		payload, err := fetchFuelDataFromURL(client, target)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if len(payload) == 0 {
+			lastErr = errors.New("received empty response")
+			continue
+		}
+		return payload, nil
+	}
+
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, errors.New("failed to fetch fuel data")
+}
+
+func buildFuelFinderTargets() []string {
+	proxyTemplate := strings.TrimSpace(os.Getenv("FUEL_PROXY_TEMPLATE"))
+	if proxyTemplate == "" {
+		return []string{fuelFinderURL}
+	}
+
+	proxyURL := buildProxyURL(proxyTemplate, fuelFinderURL)
+	return []string{fuelFinderURL, proxyURL}
+}
+
+func buildProxyURL(template, target string) string {
+	if strings.Contains(template, "{url}") {
+		return strings.ReplaceAll(template, "{url}", url.QueryEscape(target))
+	}
+	return template + target
+}
+
+func fetchFuelDataFromURL(client *http.Client, target string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, target, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/csv,application/octet-stream;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-GB,en;q=0.9")
+	req.Header.Set("Referer", "https://www.gov.uk/guidance/access-fuel-price-data")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch fuel data: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	return payload, nil
 }
 
 func convertCSVToJSON(payload []byte) ([]byte, error) {
