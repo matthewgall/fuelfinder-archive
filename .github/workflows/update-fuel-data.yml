@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   update-fuel-data:
-    runs-on: ubicloud
+    runs-on: self-hosted
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
