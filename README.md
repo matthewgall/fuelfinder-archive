@@ -1,6 +1,6 @@
 # Fuel Finder Archive
 
-Fetches the latest UK Fuel Finder CSV data on a schedule and stores it in this repository.
+Scheduled fetches of the latest UK Fuel Finder data, stored in this repository.
 
 ## Usage
 
@@ -37,3 +37,8 @@ go run . -format json
 ## GitHub Action
 
 The workflow runs hourly and on manual dispatch, committing `data.csv` only when changes are detected.
+
+## Data licence
+
+The data is available under the Open Government Licence v3.0.
+Licence text: https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/
