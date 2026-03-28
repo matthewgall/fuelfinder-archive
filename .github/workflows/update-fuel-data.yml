@@ -36,3 +36,12 @@ jobs:
           git add data.csv
           git commit -m "Update fuel data - $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           git push
+
+      - name: Notify fuelaround.me
+        if: steps.git-check.outputs.changes == 'true'
+        env:
+          REFRESH_TOKEN: ${{ secrets.FUELAROUND_REFRESH_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "x-refresh-token: ${REFRESH_TOKEN}" \
+            https://fuelaround.me/api/fuel-finder/refresh
