@@ -42,6 +42,5 @@ jobs:
         env:
           REFRESH_TOKEN: ${{ secrets.FUELAROUND_REFRESH_TOKEN }}
         run: |
-          curl -sS -X POST \
-            -H "x-refresh-token: ${REFRESH_TOKEN}" \
-            https://fuelaround.me/api/fuel-finder/refresh
+          sleep 25
+          curl -sS -H "x-refresh-token: ${REFRESH_TOKEN}" https://fuelaround.me/api/fuel-finder/refresh
